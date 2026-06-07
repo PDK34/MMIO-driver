@@ -1,0 +1,17 @@
+# Compiled Binaries
+test_cdev
+*.ko
+
+# Object files and intermediate build artifacts
+*.o
+*.mod
+*.mod.c
+*.mod.o
+
+# Kernel build management files
+modules.order
+Module.symvers
+
+# Hidden kbuild tracking files and folders
+.*.cmd
+.tmp_versions/
