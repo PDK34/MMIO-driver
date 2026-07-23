@@ -1,4 +1,4 @@
-obj-m += encrypt_cdev.o
+obj-m += scrambler_cdev.o
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules

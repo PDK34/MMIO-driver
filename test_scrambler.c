@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <stdint.h>
 
-#define DEVICE_PATH "/dev/encrypt_cdev"
+#define DEVICE_PATH "/dev/scrambler_driver"
 
 int main() {
     int fd;
