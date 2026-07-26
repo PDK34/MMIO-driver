@@ -24,9 +24,12 @@ int main() {
     printf("[User Application] Sending Data: 0x%02X with START command.\n", tx_buffer[0]);
     write(fd, tx_buffer, 2);
 
-    // Give kernel code a moment, then attempt read
-    usleep(15000); 
+    // The driver simulates a 10ms delay. Sleep for 15ms (15,000 microseconds)
+    // to ensure the STAT_READY bit is set before trying to read.
+    usleep(15000);
 
+    // Bring the file cursor back to 0 before reading
+    lseek(fd, 0, SEEK_SET);
     if (read(fd, &rx_buffer, 1) > 0) {
         printf("[User Application] Success! Read Processed Data: 0x%02X\n", rx_buffer);
         printf("[Verification] Expected: 0xA5 XOR 0x5A = 0xFF. Got: 0x%02X\n", rx_buffer);

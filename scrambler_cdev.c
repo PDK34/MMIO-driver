@@ -6,6 +6,8 @@
 #include <linux/delay.h>
 #include <linux/mutex.h>
 #include <linux/err.h>
+#include <linux/device.h>
+#include <linux/types.h>
 
 #define DEV_NAME "scrambler_driver"
 #define CLASS_NAME "scrambler_class"
@@ -27,7 +29,7 @@ static struct cdev hw_cdev;
 static struct class *dev_class;
 
 // 4 x 32-bit registers simulating memory-mapped hardware
-static uint32_t hw_registers[NUM_REGISTERS];
+static u32 hw_registers[NUM_REGISTERS];
 
 static DEFINE_MUTEX(hw_mutex);
 
@@ -62,40 +64,45 @@ static int dev_open(struct inode *inodep, struct file *filep) {
 
 // User reads from the device to get the processed data
 static ssize_t dev_read(struct file *filep, char __user *buffer, size_t len, loff_t *offset) {
-    uint8_t out_val;
+    u8 out_val;
 
-    int ret = 0;
+    if(len < 1) {
+        return 0;
+    }
+
     if (*offset > 0) return 0; // Only allow single-byte read per transaction
 
     if(mutex_lock_interruptible(&hw_mutex)) return -ERESTARTSYS;
 
     // Poll status register to check if data is ready
     if (!(hw_registers[REG_STATUS] & STAT_READY)) {
-        pr_warn("%s: Read error - Hardware data not ready.\n", DEV_NAME);
         mutex_unlock(&hw_mutex);
-        return -EAGAIN; 
+        if(filep->f_flags &  O_NONBLOCK ) {
+            return -EAGAIN; //EAGAIN should not be returned in blocking mode 
+        }
+
+        //In blocking mode, so sleep on a wait_queue here.
+        //a simple mock, so just warn and return
+        pr_warn("%s: Blocking read wait-queue not implemented. Returning -EAGAIN.\n", DEV_NAME);
+        return -EAGAIN;
     }
 
-    out_val = (uint8_t)hw_registers[REG_DATA_OUT];
+    out_val = (u8)hw_registers[REG_DATA_OUT];
+    hw_registers[REG_STATUS] &= ~STAT_READY;
+
+    mutex_unlock(&hw_mutex);     // Unlock mutex before doing copy_to_user (which can sleep/page-fault)
 
     if (copy_to_user(buffer, &out_val, 1) ) {
-        ret = -EFAULT;
-        }else{
-        // Clear ready status once read is complete
-        hw_registers[REG_STATUS] &= ~STAT_READY;
+        return -EFAULT;
+        }
 
         *offset += 1;
-        ret = 1;}
-
-        mutex_unlock(&hw_mutex);
-        return ret;
-}
-
+        return 1; //return no of bytes read as per POSIX standard
+    }
 // User writes to the device to send data and commands
 static ssize_t dev_write(struct file *filep, const char __user *buffer, size_t len, loff_t *offset) {
-    uint8_t input_command[2]; // [0] = Data Byte, [1] = Control Byte
+    u8 input_command[2]; // [0] = Data Byte, [1] = Control Byte
 
-    int ret = len;
 
     if (len < 2) {
         pr_err("%s: Write requires 2 bytes [Data, Control]\n", DEV_NAME);
@@ -109,14 +116,15 @@ static ssize_t dev_write(struct file *filep, const char __user *buffer, size_t l
     if(mutex_lock_interruptible(&hw_mutex)) return -ERESTARTSYS;
     // Write values directly into the simulated hardware registers
     hw_registers[REG_DATA_IN] = input_command[0];
-    hw_registers[REG_CTRL] = input_command[1];
+    hw_registers[REG_CTRL] = input_command[1] & (CTRL_START | CTRL_RESET);
 
     // Trigger the hardware processing cycle
     simulate_hardware_logic();
 
     mutex_unlock(&hw_mutex);
+    *offset += 2; //2 bytes writeen, so advance file ptr by 2
+    return 2; //POSIX standard, the write() system call must return the exact number of bytes it successfully processed
 
-    return ret;
 }
 
 static int dev_release(struct inode *inodep, struct file *filep) {
@@ -129,11 +137,12 @@ static const struct file_operations fops = {
     .read = dev_read,
     .write = dev_write,
     .release = dev_release,
+    .llseek = default_llseek,
 };
 
 static int __init encrypt_driver_init(void) {
     int ret;
-
+    struct device *dev;    
 
     ret = alloc_chrdev_region(&dev_num, 0, 1, DEV_NAME); //Dynamic allocation of major + minor num
     if(ret<0){
@@ -159,9 +168,10 @@ static int __init encrypt_driver_init(void) {
     }
 
     //create device node
-    if(IS_ERR(device_create(dev_class, NULL, dev_num, NULL, DEV_NAME ))){
-        pr_err("%s: Failed t0 create device\n", DEV_NAME);
-        ret = PTR_ERR(dev_class);
+    dev = device_create(dev_class, NULL, dev_num, NULL, DEV_NAME);
+    if(IS_ERR(dev)){
+        pr_err("%s: Failed to create device\n", DEV_NAME);
+        ret = PTR_ERR(dev);
         goto destroy_class;
     }
 
