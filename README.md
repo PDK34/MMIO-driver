@@ -24,7 +24,7 @@ The driver allocates a 16-byte continuous memory block in kernel space to simula
 
 ---
 # Test Output :
-![alt text](sim_output.png)
+![alt text](./images/sim_output.png)
 
 ---
 # How to Build and Run
