@@ -43,9 +43,11 @@ static void simulate_hardware_logic(void) {
 
         pr_info("%s: HW Engine - Processing Data: 0x%02X\n", DEV_NAME, hw_registers[REG_DATA_IN]);
         
+        mutex_unlock(&hw_mutex);
         // Simulate hardware propagation delay (10 milliseconds)
         msleep(10);
 
+        mutex_lock(&hw_mutex);
         // Simple hardware XOR scrambling logic (Key: 0x5A)
         hw_registers[REG_DATA_OUT] = hw_registers[REG_DATA_IN] ^ 0x5A;
 

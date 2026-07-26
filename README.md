@@ -71,7 +71,7 @@ sudo insmod scrambler_cdev.ko
 dmesg | tail -n 5
 
 # 3. Run the user-space test application
-sudo ./test_scrambler```
+sudo ./test_scrambler
 ```
 Expected Output:
 ```text
@@ -87,7 +87,7 @@ Expected Output:
 dmesg | tail -n 10
 
 # Unload the module 
-rmmod scrambler_cdev
+sudo rmmod scrambler_cdev
 
 # Exit the VM and return to your host machine
 exit
