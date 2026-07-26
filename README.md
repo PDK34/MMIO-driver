@@ -23,7 +23,10 @@ The driver allocates a 16-byte continuous memory block in kernel space to simula
 - **POSIX Compliance:** Implements proper return semantics (returning exact bytes consumed) and respects non-blocking (`O_NONBLOCK`) file descriptors by returning `-EAGAIN` when hardware is busy.
 
 ---
+# Test Output :
+![alt text](sim_output.png)
 
+---
 # How to Build and Run
 
 ## Method A: Using QEMU / virtme-ng
